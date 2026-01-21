@@ -14,3 +14,8 @@ export const getValidator = <const Ts extends readonly any[]>(values: Ts, desc =
   }
   return { is, validate }
 }
+
+export const nn = (text: string): string => `「${text}」`
+export const em = (text: string): string => `【${text}】`
+export const emIn = <T extends string>(desc: Record<T, string>, keys: T[], key: T) =>
+  keys.includes(key) ? em(desc[key]) : ''

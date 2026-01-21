@@ -1,7 +1,7 @@
 {
   "name": "koishi-plugin-w-squad",
   "description": "WillBot: Squad function",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "files": [
@@ -15,7 +15,7 @@
     "plugin"
   ],
   "peerDependencies": {
-    "koishi": "^4.18.7"
+    "koishi": "^4.18.10"
   },
   "scripts": {
     "build": "yarn workspace willbot build w-squad",
