@@ -75,4 +75,21 @@ describe('squad command safeguards', () => {
     })
     assert.equal(storedOwner.perm, 'owner')
   })
+
+  it('mentions only members on the current platform', async () => {
+    const ctx = await createFixture()
+    const { id, owner } = await createSquad(ctx)
+    const member = ctx.mock.client('member', 'group')
+    await member.shouldReply(`squad.join #${id}`, /成功加入小队/)
+    await ctx.database.create('w-squad-member-v2', {
+      uid: 'discord:foreign',
+      nick: 'Foreign',
+      squadId: id,
+      perm: 'member',
+    })
+
+    const [reply] = await owner.receive(`squad.call #${id}`, 1)
+    assert.match(reply, /<at id="member"\/>/)
+    assert.doesNotMatch(reply, /<at id="foreign"\/>/)
+  })
 })

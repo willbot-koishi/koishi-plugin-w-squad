@@ -348,7 +348,8 @@ export function apply(ctx: Context) {
       const members = await ctx.database.get('w-squad-member-v2', { squadId: id })
 
       const membersSorted = members
-        .filter(member => member.uid !== session.uid)
+        // A platform-native at cannot address users from another platform.
+        .filter(member => member.uid !== session.uid && parseUid(member.uid).platform === session.platform)
         .sort((a, b) => a.uid.localeCompare(b.uid))
 
       const memberDndRules = await ctx.database
