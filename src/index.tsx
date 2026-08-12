@@ -541,10 +541,12 @@ export function apply(ctx: Context) {
               {currentMembers.length
                 ? currentMembers.map(renderMember)
                 : <p>{session.text('.none')}</p>}
-              <p>{session.text('.other-members', { count: otherMembers.length })}</p>
               {otherMembers.length
-                ? otherMembers.map(renderMember)
-                : <p>{session.text('.none')}</p>}
+                ? <>
+                  <p>{session.text('.other-members', { count: otherMembers.length })}</p>
+                  {otherMembers.map(renderMember)}
+                </>
+                : ''}
             </>
           })()}
       </>

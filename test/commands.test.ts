@@ -247,6 +247,15 @@ describe('squad command safeguards', () => {
     assert.match(reply, /其他成员：1\n\* member/)
   })
 
+  it('omits the empty other-member group from squad info', async () => {
+    const ctx = await createFixture()
+    const { id, owner } = await createSquad(ctx)
+
+    const [reply] = await owner.receive(`squad.info #${id}`, 1)
+    assert.match(reply, /当前群成员：1/)
+    assert.doesNotMatch(reply, /其他成员/)
+  })
+
   it('removes a member binding when they leave the squad', async () => {
     const ctx = await createFixture()
     const { id } = await createSquad(ctx)
