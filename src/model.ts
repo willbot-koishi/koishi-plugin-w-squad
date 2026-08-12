@@ -55,6 +55,18 @@ export interface SquadInvitation {
   inviteeUid: string
 }
 
+export interface SquadEndpoint {
+  squadId: string
+  uid: string
+  platform: string
+  selfId: string
+  channelId: string
+  guildId: string
+  channelName: string
+  enabled: boolean
+  updatedAt: Date
+}
+
 export interface SquadMigration {
   id: string
   completedAt: Date
@@ -78,6 +90,7 @@ declare module 'koishi' {
     'w-squad-v2': Squad
     'w-squad-member-v2': SquadMember
     'w-squad-invitation-v2': SquadInvitation
+    'w-squad-endpoint': SquadEndpoint
     'w-squad-migration': SquadMigration
     'w-squad-dnd-rule': SquadDndRuleInstance
   }
@@ -154,6 +167,24 @@ export function extendSquadModels(ctx: Context) {
   }, {
     primary: ['squadId', 'inviterUid', 'inviteeUid'],
     indexes: [['inviteeUid'], ['inviterUid']],
+    foreign: {
+      squadId: ['w-squad-v2', 'id'],
+    },
+  })
+
+  ctx.model.extend('w-squad-endpoint', {
+    squadId: `char(${SQUAD_ID_LENGTH})`,
+    uid: 'string',
+    platform: 'string',
+    selfId: 'string',
+    channelId: 'string',
+    guildId: 'string',
+    channelName: 'string',
+    enabled: 'boolean',
+    updatedAt: 'timestamp',
+  }, {
+    primary: ['squadId', 'uid', 'platform', 'selfId', 'channelId'],
+    indexes: [['squadId'], ['uid', 'squadId']],
     foreign: {
       squadId: ['w-squad-v2', 'id'],
     },

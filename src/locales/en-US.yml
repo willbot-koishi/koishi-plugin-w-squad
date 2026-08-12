@@ -112,16 +112,46 @@ commands:
       target-not-member: 'User "{uid}" is not in squad "{squad}".'
       success: 'Removed user "{uid}" from squad "{squad}".'
 
+  squad.bind:
+    description: "Bind this channel for my squad calls"
+    arguments:
+      squad: "Squad name, #ID, or name#ID"
+    messages:
+      group-only: "This command can only be used in a guild channel."
+      success: 'Bound this channel to squad "{squad}".'
+
+  squad.unbind:
+    description: "Unbind this channel from my squad calls"
+    arguments:
+      squad: "Squad name, #ID, or name#ID"
+    messages:
+      group-only: "This command can only be used in a guild channel."
+      not-bound: 'This channel is not bound to squad "{squad}".'
+      success: 'Unbound this channel from squad "{squad}".'
+
+  squad.groups:
+    description: "List channels I have bound for a squad"
+    arguments:
+      squad: "Squad name, #ID, or name#ID"
+    messages:
+      summary: 'You have bound {count} channel(s) for squad "{squad}":'
+      item: "* {current}{channel} ({bot})"
+      current: "[Current] "
+      none: 'You have not bound any channels for squad "{squad}".'
+
   squad.call:
-    description: "Call all squad members with an optional message"
+    description: "Call squad members in all bound channels with an optional message"
     arguments:
       squad: "Squad name, #ID, or name#ID"
       message: "Optional message"
     messages:
       group-only: "This command can only be used in a guild channel."
-      summary: 'Calling members of squad "{squad}" on this platform!'
-      no-members: "There are no other squad members available to call on this platform."
-      dnd-summary: "(Skipped DND members: {count})"
+      summary: 'Calling members of squad "{squad}"!'
+      result: "Call result: delivered to {succeeded} channel(s); {failed} delivery failure(s)."
+      no-members: "There are no other members in this squad."
+      no-delivery: "There is no squad call to deliver."
+      dnd-summary: "Skipped {count} member(s) in DND."
+      unbound-summary: "{count} member(s) have no available bound channel."
       attached-message: "Message: {message}"
 
   squad.info:
@@ -132,6 +162,9 @@ commands:
       name: "Squad: {squad}"
       join-type: "Join type: {joinType}"
       members: "Members: {count}"
+      current-members: "Members in this channel: {count}"
+      other-members: "Other members: {count}"
+      none: "* None"
       member-item: "* {badges}{nick}"
 
   squad.dnd:

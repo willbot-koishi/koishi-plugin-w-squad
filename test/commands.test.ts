@@ -3,7 +3,7 @@ import { afterEach, describe, it } from 'node:test'
 
 import memory from '@koishijs/plugin-database-memory'
 import Mock from '@koishijs/plugin-mock'
-import { Context, type Plugin } from 'koishi'
+import { Context, h, type Plugin } from 'koishi'
 
 import * as squadPlugin from '../src'
 
@@ -43,6 +43,18 @@ async function createSquad(ctx: Context, name = 'Alpha') {
   return { id, owner }
 }
 
+function captureProactiveMessages(ctx: Context) {
+  const bot = ctx.bots[0]
+  const original = bot.sendMessage.bind(bot)
+  const messages: Array<{ channelId: string, content: string }> = []
+  bot.sendMessage = (async (channelId, content, referrer, options) => {
+    if (options?.session) return original(channelId, content, referrer, options)
+    messages.push({ channelId, content: h.normalize(content).join('') })
+    return [`message-${messages.length}`]
+  }) as typeof bot.sendMessage
+  return messages
+}
+
 describe('squad command safeguards', () => {
   it('allows only owners to modify settings', async () => {
     const ctx = await createFixture()
@@ -80,11 +92,12 @@ describe('squad command safeguards', () => {
     assert.equal(storedOwner.perm, 'owner')
   })
 
-  it('mentions only members on the current platform', async () => {
+  it('mentions bound members and reports unbound members', async () => {
     const ctx = await createFixture()
     const { id, owner } = await createSquad(ctx)
     const member = ctx.mock.client('member', 'group')
     await member.shouldReply(`squad.join #${id}`, /成功加入小队/)
+    await member.shouldReply(`squad.bind #${id}`, /已将当前群绑定/)
     await ctx.database.create('w-squad-member-v2', {
       uid: 'discord:foreign',
       nick: 'Foreign',
@@ -95,7 +108,7 @@ describe('squad command safeguards', () => {
     const [reply] = await owner.receive(`squad.call #${id}`, 1)
     assert.match(reply, /<at id="member"\/>/)
     assert.doesNotMatch(reply, /<at id="foreign"\/>/)
-    assert.doesNotMatch(reply, /没有其他可呼叫的小队成员/)
+    assert.match(reply, /有 1 名成员没有绑定任何可用群/)
   })
 
   it('counts each DND member once', async () => {
@@ -103,6 +116,7 @@ describe('squad command safeguards', () => {
     const { id, owner } = await createSquad(ctx)
     const member = ctx.mock.client('member', 'group')
     await member.shouldReply(`squad.join #${id}`, /成功加入小队/)
+    await member.shouldReply(`squad.bind #${id}`, /已将当前群绑定/)
     await ctx.database.create('w-squad-dnd-rule', {
       uid: 'mock:member',
       rule: { days: null, period: null },
@@ -114,8 +128,98 @@ describe('squad command safeguards', () => {
 
     const [reply] = await owner.receive(`squad.call #${id}`, 1)
     assert.doesNotMatch(reply, /<at id="member"\/>/)
-    assert.match(reply, /当前平台没有其他可呼叫的小队成员/)
+    assert.match(reply, /没有可投递的小队呼叫/)
     assert.match(reply, /忽略了 1 名免打扰的成员/)
+  })
+
+  it('delivers to every binding and merges the local call with its result', async () => {
+    const ctx = await createFixture()
+    const { id } = await createSquad(ctx)
+    const caller = ctx.mock.client('owner', 'group-a')
+    const local = ctx.mock.client('local', 'group-a')
+    const remoteB = ctx.mock.client('remote', 'group-b')
+    const remoteC = ctx.mock.client('remote', 'group-c')
+
+    await local.shouldReply(`squad.join #${id}`, /成功加入小队/)
+    await local.shouldReply(`squad.bind #${id}`, /已将当前群绑定/)
+    await remoteB.shouldReply(`squad.join #${id}`, /成功加入小队/)
+    await remoteB.shouldReply(`squad.bind #${id}`, /已将当前群绑定/)
+    await remoteC.shouldReply(`squad.bind #${id}`, /已将当前群绑定/)
+
+    const proactive = captureProactiveMessages(ctx)
+    const replies = await caller.receive(`squad.call #${id} 集合`)
+
+    assert.equal(replies.length, 1)
+    assert.match(replies[0], /<at id="local"\/>/)
+    assert.match(replies[0], /呼叫结果：成功投递到 3 个群，0 个群投递失败/)
+    assert.equal(proactive.length, 2)
+    assert.deepEqual(proactive.map(message => message.channelId).sort(), ['group-b', 'group-c'])
+    for (const message of proactive) {
+      assert.match(message.content, /<at id="remote"\/>/)
+      assert.match(message.content, /【集合】/)
+      assert.doesNotMatch(message.content, /呼叫结果/)
+    }
+  })
+
+  it('reports delivery failures without failing the command', async () => {
+    const ctx = await createFixture()
+    const { id, owner } = await createSquad(ctx)
+    await ctx.database.create('w-squad-member-v2', {
+      uid: 'discord:member',
+      nick: 'member',
+      squadId: id,
+      perm: 'member',
+    })
+    await ctx.database.create('w-squad-endpoint', {
+      squadId: id,
+      uid: 'discord:member',
+      platform: 'discord',
+      selfId: 'offline',
+      channelId: 'group-b',
+      guildId: 'group-b',
+      channelName: 'group-b',
+      enabled: true,
+      updatedAt: new Date(),
+    })
+
+    const [reply] = await owner.receive(`squad.call #${id}`, 1)
+    assert.match(reply, /成功投递到 0 个群，1 个群投递失败/)
+  })
+
+  it('groups squad info by bindings in the current channel', async () => {
+    const ctx = await createFixture()
+    const { id, owner } = await createSquad(ctx)
+    const member = ctx.mock.client('member', 'group-b')
+    await owner.shouldReply(`squad.bind #${id}`, /已将当前群绑定/)
+    await member.shouldReply(`squad.join #${id}`, /成功加入小队/)
+    await member.shouldReply(`squad.bind #${id}`, /已将当前群绑定/)
+
+    const [reply] = await owner.receive(`squad.info #${id}`, 1)
+    assert.match(reply, /当前群成员：1\n\* 【你】【所有者】owner/)
+    assert.match(reply, /其他成员：1\n\* member/)
+  })
+
+  it('removes a member binding when they leave the squad', async () => {
+    const ctx = await createFixture()
+    const { id } = await createSquad(ctx)
+    const member = ctx.mock.client('member', 'group-b')
+    await member.shouldReply(`squad.join #${id}`, /成功加入小队/)
+    await member.shouldReply(`squad.bind #${id}`, /已将当前群绑定/)
+
+    await member.shouldReply(`squad.leave #${id}`, /已离开小队/)
+    assert.deepEqual(await ctx.database.get('w-squad-endpoint', { squadId: id }), [])
+  })
+
+  it('binds each channel once and allows it to be unbound', async () => {
+    const ctx = await createFixture()
+    const { id, owner } = await createSquad(ctx)
+
+    await owner.shouldReply(`squad.bind #${id}`, /已将当前群绑定/)
+    await owner.shouldReply(`squad.bind #${id}`, /已将当前群绑定/)
+    assert.equal((await ctx.database.get('w-squad-endpoint', { squadId: id })).length, 1)
+    await owner.shouldReply(`squad.groups #${id}`, /你为小队「Alpha#[^」]+」绑定了 1 个群/)
+    await owner.shouldReply(`squad.unbind #${id}`, /已解除当前群/)
+    await owner.shouldReply(`squad.unbind #${id}`, /当前群没有绑定/)
   })
 
   it('renders commands and validation errors in English', async () => {
@@ -144,7 +248,7 @@ describe('squad command safeguards', () => {
     )
     await client.shouldReply(
       `squad.call #${id}`,
-      /There are no other squad members available to call on this platform\./,
+      /There are no other members in this squad\./,
     )
   })
 

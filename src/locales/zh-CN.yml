@@ -112,16 +112,46 @@ commands:
       target-not-member: "用户「{uid}」不在小队「{squad}」中。"
       success: "已将用户「{uid}」踢出小队「{squad}」。"
 
+  squad.bind:
+    description: "将当前群绑定为我的小队呼叫群"
+    arguments:
+      squad: "小队名称、#ID 或名称#ID"
+    messages:
+      group-only: "此命令只能在群聊中使用。"
+      success: "已将当前群绑定到小队「{squad}」。"
+
+  squad.unbind:
+    description: "解除当前群的小队呼叫绑定"
+    arguments:
+      squad: "小队名称、#ID 或名称#ID"
+    messages:
+      group-only: "此命令只能在群聊中使用。"
+      not-bound: "当前群没有绑定到小队「{squad}」。"
+      success: "已解除当前群与小队「{squad}」的绑定。"
+
+  squad.groups:
+    description: "查看我为小队绑定的群"
+    arguments:
+      squad: "小队名称、#ID 或名称#ID"
+    messages:
+      summary: "你为小队「{squad}」绑定了 {count} 个群："
+      item: "* {current}{channel}（{bot}）"
+      current: "【当前群】"
+      none: "你还没有为小队「{squad}」绑定群。"
+
   squad.call:
-    description: "呼叫所有小队成员，可以附带一条消息"
+    description: "在所有绑定群中呼叫小队成员，可以附带一条消息"
     arguments:
       squad: "小队名称、#ID 或名称#ID"
       message: "附带的消息"
     messages:
       group-only: "此命令只能在群聊中使用。"
-      summary: "正在呼叫小队「{squad}」中当前平台的成员！"
-      no-members: "当前平台没有其他可呼叫的小队成员。"
-      dnd-summary: "（忽略了 {count} 名免打扰的成员）"
+      summary: "正在呼叫小队「{squad}」的成员！"
+      result: "呼叫结果：成功投递到 {succeeded} 个群，{failed} 个群投递失败。"
+      no-members: "小队中没有其他成员。"
+      no-delivery: "没有可投递的小队呼叫。"
+      dnd-summary: "忽略了 {count} 名免打扰的成员。"
+      unbound-summary: "有 {count} 名成员没有绑定任何可用群。"
       attached-message: "【{message}】"
 
   squad.info:
@@ -132,6 +162,9 @@ commands:
       name: "小队：{squad}"
       join-type: "加入方式：{joinType}"
       members: "成员：{count}"
+      current-members: "当前群成员：{count}"
+      other-members: "其他成员：{count}"
+      none: "* 无"
       member-item: "* {badges}{nick}"
 
   squad.dnd:
