@@ -66,6 +66,13 @@ export function apply(ctx: Context) {
     .option('joinType', '-j, --join-type <type:string> 加入小队方式 (free | invite)')
     .action(async ({ session, options }, source) => {
       const squad = await resolveSquad(ctx, session.uid, source, 'member')
+      const [member] = await ctx.database.get('w-squad-member-v2', {
+        uid: session.uid,
+        squadId: squad.id,
+      })
+      if (member?.perm !== 'owner') {
+        return `你不是小队${nn(formatSquad(squad))}的所有者，无法修改设置。`
+      }
 
       const squadUpdate: Partial<Squad> = {}
       const updateDesc: string[] = []
