@@ -8,6 +8,8 @@ commands:
       name: "小队名称"
     options:
       joinType: "加入小队方式 (free | invite)"
+      bind: "创建后将当前群绑定到小队（默认启用）"
+      noBind: "创建后不将当前群绑定到小队"
     messages:
       success: "成功创建小队「{squad}」。"
 
@@ -75,6 +77,9 @@ commands:
     description: "加入小队"
     arguments:
       squad: "小队名称、#ID 或名称#ID"
+    options:
+      bind: "加入后将当前群绑定到小队（默认启用）"
+      noBind: "加入后不将当前群绑定到小队"
     messages:
       already-member: "你已在小队「{squad}」中。"
       invitation-required: "小队「{squad}」需邀请才能加入。"

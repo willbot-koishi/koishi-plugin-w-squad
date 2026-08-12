@@ -56,6 +56,54 @@ function captureProactiveMessages(ctx: Context) {
 }
 
 describe('squad command safeguards', () => {
+  it('binds create and join channels by default', async () => {
+    const ctx = await createFixture()
+    const { id } = await createSquad(ctx)
+    const member = ctx.mock.client('member', 'group-b')
+    await member.shouldReply(`squad.join #${id}`, /成功加入小队/)
+
+    const bindings = await ctx.database.get('w-squad-endpoint', { squadId: id })
+    assert.deepEqual(bindings.map(binding => [binding.uid, binding.channelId]).sort(), [
+      ['mock:member', 'group-b'],
+      ['mock:owner', 'group'],
+    ])
+  })
+
+  it('supports disabling automatic create and join bindings', async () => {
+    const ctx = await createFixture()
+    const owner = ctx.mock.client('owner', 'group')
+    const [created] = await owner.receive('squad.create Alpha -B', 1)
+    const id = created.match(/#([0-9A-HJKMNP-TV-Z]{8})/)?.[1]
+    assert.ok(id)
+
+    const member = ctx.mock.client('member', 'group-b')
+    await member.shouldReply(`squad.join #${id} --no-bind`, /成功加入小队/)
+    assert.deepEqual(await ctx.database.get('w-squad-endpoint', { squadId: id }), [])
+  })
+
+  it('declares bind as a positive option with a negative short variant', async () => {
+    const ctx = await createFixture()
+
+    for (const name of ['squad.create', 'squad.join']) {
+      const command = ctx.$commander.resolve(name)!
+      const option = command._options.bind
+      assert.equal(option.syntax, '--bind')
+      assert.equal(option.fallback, true)
+      assert.equal(option.variants.false.syntax, '-B')
+      assert.equal(option.variants.false.value, false)
+    }
+  })
+
+  it('does not create a binding from a direct conversation', async () => {
+    const ctx = await createFixture()
+    const owner = ctx.mock.client('owner')
+    const [created] = await owner.receive('squad.create Alpha', 1)
+    const id = created.match(/#([0-9A-HJKMNP-TV-Z]{8})/)?.[1]
+    assert.ok(id)
+
+    assert.deepEqual(await ctx.database.get('w-squad-endpoint', { squadId: id }), [])
+  })
+
   it('allows only owners to modify settings', async () => {
     const ctx = await createFixture()
     const { id, owner } = await createSquad(ctx)
@@ -207,7 +255,10 @@ describe('squad command safeguards', () => {
     await member.shouldReply(`squad.bind #${id}`, /已将当前群绑定/)
 
     await member.shouldReply(`squad.leave #${id}`, /已离开小队/)
-    assert.deepEqual(await ctx.database.get('w-squad-endpoint', { squadId: id }), [])
+    assert.deepEqual(await ctx.database.get('w-squad-endpoint', {
+      squadId: id,
+      uid: 'mock:member',
+    }), [])
   })
 
   it('binds each channel once and allows it to be unbound', async () => {

@@ -1,7 +1,13 @@
 import { $, Context, Schema, SessionError } from 'koishi'
 import { createSquadCallPlan, deliverSquadCall, SquadCallTarget } from './call'
 import { validateJoinType, JOIN_TYPE_PATH, OWNER_BADGE_PATH } from './enums'
-import { getEndpointIdentity, getEndpointKey, getEndpointName, isCurrentEndpoint } from './endpoint'
+import {
+  bindSquadEndpoint,
+  createSquadEndpoint,
+  getEndpointIdentity,
+  getEndpointKey,
+  isCurrentEndpoint,
+} from './endpoint'
 import { formatSquad, getUserDndRules, parseUid, resolveSquad, validateName } from './operations'
 import { explainDndRule, explainDndRuleWithFormatted, formatDndRule, parseDndRule, testDndRule } from './dnd-rule'
 import { createSquad, extendSquadModels, migrateSquadV2, Squad } from './model'
@@ -37,6 +43,11 @@ export function apply(ctx: Context) {
     .option('joinType', '-j, --join-type <type:string>',
       { fallback: 'free' }
     )
+    .option('bind', '--bind', { fallback: true })
+    .option('bind', '-B', {
+      value: false,
+      descPath: 'commands.squad.create.options.noBind',
+    })
     .action(async ({ session, options }, name) => {
       name = validateName(name)
       const squad = await createSquad(ctx, {
@@ -52,7 +63,14 @@ export function apply(ctx: Context) {
           nick: session.username,
           perm: 'owner',
         })
+        if (options.bind && !session.isDirect) {
+          await bindSquadEndpoint(ctx, session, squad.id)
+        }
       } catch (error) {
+        await Promise.all([
+          ctx.database.remove('w-squad-member-v2', { squadId: squad.id }),
+          ctx.database.remove('w-squad-endpoint', { squadId: squad.id }),
+        ])
         await ctx.database.remove('w-squad-v2', { id: squad.id })
         throw error
       }
@@ -270,7 +288,12 @@ export function apply(ctx: Context) {
     })
 
   ctx.command('squad.join <squad:string>')
-    .action(async ({ session }, source) => {
+    .option('bind', '--bind', { fallback: true })
+    .option('bind', '-B', {
+      value: false,
+      descPath: 'commands.squad.join.options.noBind',
+    })
+    .action(async ({ session, options }, source) => {
       const squad = await resolveSquad(ctx, session.uid, source, 'public')
       const { id, joinType } = squad
 
@@ -288,6 +311,17 @@ export function apply(ctx: Context) {
         perm: 'member',
         nick: session.username,
       })
+      if (options.bind && !session.isDirect) {
+        try {
+          await bindSquadEndpoint(ctx, session, id)
+        } catch (error) {
+          await Promise.all([
+            ctx.database.remove('w-squad-member-v2', { uid, squadId: id }),
+            ctx.database.remove('w-squad-endpoint', { uid, squadId: id }),
+          ])
+          throw error
+        }
+      }
 
       return session.text('.success', { squad: formatSquad(squad) })
     })
@@ -371,22 +405,12 @@ export function apply(ctx: Context) {
     .action(async ({ session, options }, source) => {
       if (session.isDirect) return session.text('.group-only')
 
-      const endpoint = getEndpointIdentity(session)
-      const createBinding = (squadId: string) => ({
-        squadId,
-        uid: session.uid,
-        ...endpoint,
-        channelName: getEndpointName(session),
-        enabled: true,
-        updatedAt: new Date(),
-      })
-
       if (options.all) {
         const memberships = await ctx.database.get('w-squad-member-v2', { uid: session.uid })
         if (!memberships.length) return session.text('.no-squads')
 
         await ctx.database.upsert('w-squad-endpoint', memberships.map(member =>
-          createBinding(member.squadId)
+          createSquadEndpoint(session, member.squadId)
         ))
         return session.text('.all-success', { count: memberships.length })
       }
@@ -394,7 +418,7 @@ export function apply(ctx: Context) {
       if (!source) return session.text('.missing-squad')
 
       const squad = await resolveSquad(ctx, session.uid, source, 'member')
-      await ctx.database.upsert('w-squad-endpoint', [createBinding(squad.id)])
+      await bindSquadEndpoint(ctx, session, squad.id)
       return session.text('.success', { squad: formatSquad(squad) })
     })
 

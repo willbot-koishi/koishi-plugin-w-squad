@@ -8,6 +8,8 @@ commands:
       name: "Squad name"
     options:
       joinType: "How users may join (free | invite)"
+      bind: "Bind this channel after creation (enabled by default)"
+      noBind: "Do not bind this channel after creation"
     messages:
       success: 'Created squad "{squad}".'
 
@@ -75,6 +77,9 @@ commands:
     description: "Join a squad"
     arguments:
       squad: "Squad name, #ID, or name#ID"
+    options:
+      bind: "Bind this channel after joining (enabled by default)"
+      noBind: "Do not bind this channel after joining"
     messages:
       already-member: 'You are already in squad "{squad}".'
       invitation-required: 'Squad "{squad}" requires an invitation to join.'

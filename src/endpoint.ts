@@ -1,4 +1,4 @@
-import { Session } from 'koishi'
+import { Context, Session } from 'koishi'
 
 import { SquadEndpoint } from './model'
 
@@ -28,4 +28,19 @@ export function isCurrentEndpoint(endpoint: SquadEndpoint, session: Session) {
 
 export function getEndpointName(session: Session) {
   return session.event.guild?.name || session.event.channel?.name || session.channelId
+}
+
+export function createSquadEndpoint(session: Session, squadId: string): SquadEndpoint {
+  return {
+    squadId,
+    uid: session.uid,
+    ...getEndpointIdentity(session),
+    channelName: getEndpointName(session),
+    enabled: true,
+    updatedAt: new Date(),
+  }
+}
+
+export async function bindSquadEndpoint(ctx: Context, session: Session, squadId: string) {
+  await ctx.database.upsert('w-squad-endpoint', [createSquadEndpoint(session, squadId)])
 }
