@@ -116,8 +116,13 @@ commands:
     description: "将当前群绑定为我的小队呼叫群"
     arguments:
       squad: "小队名称、#ID 或名称#ID"
+    options:
+      all: "绑定我加入的所有小队"
     messages:
       group-only: "此命令只能在群聊中使用。"
+      missing-squad: "请指定要绑定的小队，或使用 --all 绑定所有加入的小队。"
+      no-squads: "你还没有加入任何小队。"
+      all-success: "已将当前群绑定到你加入的 {count} 个小队。"
       success: "已将当前群绑定到小队「{squad}」。"
 
   squad.unbind:

@@ -366,21 +366,35 @@ export function apply(ctx: Context) {
       return session.text('.success', params)
     })
 
-  ctx.command('squad.bind <squad:string>')
-    .action(async ({ session }, source) => {
+  ctx.command('squad.bind [squad:string]')
+    .option('all', '-a, --all')
+    .action(async ({ session, options }, source) => {
       if (session.isDirect) return session.text('.group-only')
 
-      const squad = await resolveSquad(ctx, session.uid, source, 'member')
       const endpoint = getEndpointIdentity(session)
-      await ctx.database.upsert('w-squad-endpoint', [{
-        squadId: squad.id,
+      const createBinding = (squadId: string) => ({
+        squadId,
         uid: session.uid,
         ...endpoint,
         channelName: getEndpointName(session),
         enabled: true,
         updatedAt: new Date(),
-      }])
+      })
 
+      if (options.all) {
+        const memberships = await ctx.database.get('w-squad-member-v2', { uid: session.uid })
+        if (!memberships.length) return session.text('.no-squads')
+
+        await ctx.database.upsert('w-squad-endpoint', memberships.map(member =>
+          createBinding(member.squadId)
+        ))
+        return session.text('.all-success', { count: memberships.length })
+      }
+
+      if (!source) return session.text('.missing-squad')
+
+      const squad = await resolveSquad(ctx, session.uid, source, 'member')
+      await ctx.database.upsert('w-squad-endpoint', [createBinding(squad.id)])
       return session.text('.success', { squad: formatSquad(squad) })
     })
 

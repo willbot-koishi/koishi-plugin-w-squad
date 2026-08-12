@@ -222,6 +222,30 @@ describe('squad command safeguards', () => {
     await owner.shouldReply(`squad.unbind #${id}`, /当前群没有绑定/)
   })
 
+  it('binds all joined squads in the current channel', async () => {
+    const ctx = await createFixture()
+    const { id: firstId, owner } = await createSquad(ctx, 'First')
+    const { id: secondId } = await createSquad(ctx, 'Second')
+
+    await owner.shouldReply('squad.bind -a', '已将当前群绑定到你加入的 2 个小队。')
+    const bindings = await ctx.database.get('w-squad-endpoint', { uid: 'mock:owner' })
+    assert.deepEqual(bindings.map(binding => binding.squadId).sort(), [firstId, secondId].sort())
+
+    await owner.shouldReply('squad.bind --all', '已将当前群绑定到你加入的 2 个小队。')
+    assert.equal((await ctx.database.get('w-squad-endpoint', { uid: 'mock:owner' })).length, 2)
+  })
+
+  it('explains missing and empty bind selections', async () => {
+    const ctx = await createFixture()
+    const client = ctx.mock.client('newcomer', 'group')
+
+    await client.shouldReply(
+      'squad.bind',
+      '请指定要绑定的小队，或使用 --all 绑定所有加入的小队。',
+    )
+    await client.shouldReply('squad.bind -a', '你还没有加入任何小队。')
+  })
+
   it('renders commands and validation errors in English', async () => {
     const ctx = await createFixture()
     const client = ctx.mock.client('english', 'group')

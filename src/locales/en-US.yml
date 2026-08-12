@@ -116,8 +116,13 @@ commands:
     description: "Bind this channel for my squad calls"
     arguments:
       squad: "Squad name, #ID, or name#ID"
+    options:
+      all: "Bind every squad I have joined"
     messages:
       group-only: "This command can only be used in a guild channel."
+      missing-squad: "Specify a squad, or use --all to bind every squad you have joined."
+      no-squads: "You have not joined any squads."
+      all-success: "Bound this channel to all {count} squad(s) you have joined."
       success: 'Bound this channel to squad "{squad}".'
 
   squad.unbind:
