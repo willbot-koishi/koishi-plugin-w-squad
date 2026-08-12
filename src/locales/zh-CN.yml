@@ -149,6 +149,15 @@ commands:
       current: "【当前群】"
       none: "你还没有为小队「{squad}」绑定群。"
 
+  squad.callme:
+    description: "修改自己在小队中的名称"
+    arguments:
+      squad: "小队名称、#ID 或名称#ID"
+      name: "新的小队成员名称"
+    messages:
+      empty-name: "小队成员名称不能为空。"
+      success: "已将你在小队「{squad}」中的名称修改为「{name}」。"
+
   squad.call:
     description: "在所有绑定群中呼叫小队成员，可以附带一条消息"
     arguments:

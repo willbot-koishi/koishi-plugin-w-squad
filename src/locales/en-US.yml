@@ -149,6 +149,15 @@ commands:
       current: "[Current] "
       none: 'You have not bound any channels for squad "{squad}".'
 
+  squad.callme:
+    description: "Change my display name in a squad"
+    arguments:
+      squad: "Squad name, #ID, or name#ID"
+      name: "New squad member name"
+    messages:
+      empty-name: "The squad member name cannot be empty."
+      success: 'Changed your name in squad "{squad}" to "{name}".'
+
   squad.call:
     description: "Call squad members in all bound channels with an optional message"
     arguments:

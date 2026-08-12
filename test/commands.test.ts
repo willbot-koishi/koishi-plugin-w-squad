@@ -295,6 +295,28 @@ describe('squad command safeguards', () => {
     assert.equal((await ctx.database.get('w-squad-endpoint', { uid: 'mock:owner' })).length, 2)
   })
 
+  it('changes the current member name in one squad', async () => {
+    const ctx = await createFixture()
+    const { id: firstId, owner } = await createSquad(ctx, 'First')
+    const { id: secondId } = await createSquad(ctx, 'Second')
+
+    await owner.shouldReply(
+      `squad.callme #${firstId} New Call Name`,
+      `已将你在小队「First#${firstId}」中的名称修改为「New Call Name」。`,
+    )
+    assert.equal((await ctx.database.get('w-squad-member-v2', {
+      uid: 'mock:owner',
+      squadId: firstId,
+    }))[0].nick, 'New Call Name')
+    assert.equal((await ctx.database.get('w-squad-member-v2', {
+      uid: 'mock:owner',
+      squadId: secondId,
+    }))[0].nick, 'owner')
+
+    const [info] = await owner.receive(`squad.info #${firstId}`, 1)
+    assert.match(info, /【你】【所有者】New Call Name/)
+  })
+
   it('explains missing and empty bind selections', async () => {
     const ctx = await createFixture()
     const client = ctx.mock.client('newcomer', 'group')

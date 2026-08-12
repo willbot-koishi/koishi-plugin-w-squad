@@ -460,6 +460,23 @@ export function apply(ctx: Context) {
         : session.text('.none', { squad: formatSquad(squad) })
     })
 
+  ctx.command('squad.callme <squad:string> <name:text>')
+    .action(async ({ session }, source, memberName) => {
+      const squad = await resolveSquad(ctx, session.uid, source, 'member')
+      memberName = memberName.trim().normalize('NFC')
+      if (!memberName) return session.text('.empty-name')
+
+      await ctx.database.set('w-squad-member-v2', {
+        uid: session.uid,
+        squadId: squad.id,
+      }, { nick: memberName })
+
+      return session.text('.success', {
+        squad: formatSquad(squad),
+        name: memberName,
+      })
+    })
+
   ctx.command('squad.call <squad:string> [message:text]')
     .action(async ({ session }, source, message) => {
       if (session.isDirect) return session.text('.group-only')
