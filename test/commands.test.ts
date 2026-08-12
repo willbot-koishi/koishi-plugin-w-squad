@@ -92,4 +92,23 @@ describe('squad command safeguards', () => {
     assert.match(reply, /<at id="member"\/>/)
     assert.doesNotMatch(reply, /<at id="foreign"\/>/)
   })
+
+  it('counts each DND member once', async () => {
+    const ctx = await createFixture()
+    const { id, owner } = await createSquad(ctx)
+    const member = ctx.mock.client('member', 'group')
+    await member.shouldReply(`squad.join #${id}`, /成功加入小队/)
+    await ctx.database.create('w-squad-dnd-rule', {
+      uid: 'mock:member',
+      rule: { days: null, period: null },
+    })
+    await ctx.database.create('w-squad-dnd-rule', {
+      uid: 'mock:member',
+      rule: { days: null, period: null },
+    })
+
+    const [reply] = await owner.receive(`squad.call #${id}`, 1)
+    assert.doesNotMatch(reply, /<at id="member"\/>/)
+    assert.match(reply, /忽略了 1 名免打扰的成员/)
+  })
 })

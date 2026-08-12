@@ -369,11 +369,11 @@ export function apply(ctx: Context) {
           const now = new Date()
           if (testDndRule(dndRule.rule, now)) {
             dndMatched = true
-            dndMatchedCount ++
           }
 
           dndRuleIndex ++
         }
+        if (dndMatched) dndMatchedCount ++
         return !dndMatched
       })
 
