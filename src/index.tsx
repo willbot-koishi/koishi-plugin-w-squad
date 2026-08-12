@@ -1,97 +1,29 @@
 import { $, Context, Schema } from 'koishi'
 import { em, emIn, nn } from './utils'
-import { SquadPerm, SquadJoinType, validateJoinType, JOIN_TYPE_DESC, PERM_DESC } from './enums'
-import { validateName, validateSquadExists, parseUid, getUserDndRules } from './operations'
-import { explainDndRule, explainDndRuleWithFormatted, formatDndRule, parseDndRule, SquadDndRule, testDndRule } from './dnd-rule'
+import { validateJoinType, JOIN_TYPE_DESC, PERM_DESC } from './enums'
+import { formatSquad, getUserDndRules, parseUid, resolveSquad, validateName } from './operations'
+import { explainDndRule, explainDndRuleWithFormatted, formatDndRule, parseDndRule, testDndRule } from './dnd-rule'
+import { createSquad, extendSquadModels, migrateSquadV2, Squad } from './model'
+
+export * from './model'
 
 export const name = 'w-squad'
 
 export const inject = ['database']
 
-export interface SquadMember {
-  uid: string
-  nick: string
-  squadId: number
-  perm: SquadPerm
-}
-
-export interface Squad {
-  id: number
-  name: string
-  joinType: SquadJoinType
-  permCall: SquadPerm
-  isPublic: boolean
-}
-
-export interface SquadInvitation {
-  squadId: number
-  inviterUid: string
-  inviterNick: string
-  inviteeUid: string
-}
-
-export interface SquadDndRuleInstance {
-  id: number
-  uid: string
-  rule: SquadDndRule
-}
-
-export interface SquadDndRuleInstanceWithSlot extends SquadDndRuleInstance {
-  slot: number
-}
-
-declare module 'koishi' {
-  interface Tables {
-    'w-squad': Squad
-    'w-squad-member': SquadMember
-    'w-squad-invitation': SquadInvitation
-    'w-squad-dnd-rule': SquadDndRuleInstance
-  }
-}
-
 export function apply(ctx: Context) {
-  ctx.model.extend('w-squad', {
-    id: 'unsigned',
-    name: 'string',
-    joinType: 'string',
-    permCall: 'string',
-    isPublic: 'boolean',
-  }, {
-    autoInc: true,
-    primary: 'id',
-  })
+  extendSquadModels(ctx)
 
-  ctx.model.extend('w-squad-invitation', {
-    squadId: 'unsigned',
-    inviterUid: 'string',
-    inviterNick: 'string',
-    inviteeUid: 'string',
-  }, {
-    primary: ['squadId', 'inviterUid', 'inviteeUid'],
-    foreign: {
-      squadId: ['w-squad', 'id'],
+  ctx.on('ready', async () => {
+    const result = await migrateSquadV2(ctx)
+    if (!result.skipped && (result.squads || result.members || result.invitations)) {
+      ctx.logger.info(
+        'migrated %d squad(s), %d member(s), and %d invitation(s) to v2',
+        result.squads,
+        result.members,
+        result.invitations,
+      )
     }
-  })
-
-  ctx.model.extend('w-squad-member', {
-    uid: 'string',
-    nick: 'string',
-    squadId: 'unsigned',
-    perm: 'string',
-  }, {
-    primary: ['uid', 'squadId'],
-    foreign: {
-      squadId: ['w-squad', 'id'],
-    }
-  })
-
-  ctx.model.extend('w-squad-dnd-rule', {
-    id: 'unsigned',
-    uid: 'string',
-    rule: 'json',
-  }, {
-    autoInc: true,
-    primary: 'id',
   })
 
   ctx.i18n.define('en-US', {
@@ -108,37 +40,38 @@ export function apply(ctx: Context) {
     )
     .action(async ({ session, options }, name) => {
       name = validateName(name)
-
-      const [existingSquad] = await ctx.database.get('w-squad', { name })
-      if (existingSquad) return `小队名${nn(name)}已被使用。`
-
-      const squad = await ctx.database.create('w-squad', {
+      const squad = await createSquad(ctx, {
         name,
         joinType: validateJoinType(options.joinType),
+        permCall: 'member',
         isPublic: true,
       })
-      await ctx.database.create('w-squad-member', {
-        uid: session.uid,
-        squadId: squad.id,
-        nick: session.username,
-        perm: 'owner',
-      })
+      try {
+        await ctx.database.create('w-squad-member-v2', {
+          uid: session.uid,
+          squadId: squad.id,
+          nick: session.username,
+          perm: 'owner',
+        })
+      } catch (error) {
+        await ctx.database.remove('w-squad-v2', { id: squad.id })
+        throw error
+      }
 
-      return `成功创建小队 ${nn(name)}。`
+      return `成功创建小队 ${nn(formatSquad(squad))}。`
     })
 
-  ctx.command('squad.modify <name:string>', '修改小队设置')
+  ctx.command('squad.modify <squad:string>', '修改小队设置')
     .option('name', '-n <name:string> 小队名称')
     .option('joinType', '-j, --join-type <type:string> 加入小队方式 (free | invite)')
-    .action(async ({ options }, name) => {
-      name = validateName(name)
-      const squad = await validateSquadExists(ctx, name)
+    .action(async ({ session, options }, source) => {
+      const squad = await resolveSquad(ctx, session.uid, source, 'member')
 
       const squadUpdate: Partial<Squad> = {}
       const updateDesc: string[] = []
       if (options.name) {
         squadUpdate.name = validateName(options.name)
-        updateDesc.push(`名称：${nn(name)}`)
+        updateDesc.push(`名称：${nn(squadUpdate.name)}`)
       }
       if (options.joinType) {
         squadUpdate.joinType = validateJoinType(options.joinType)
@@ -147,36 +80,35 @@ export function apply(ctx: Context) {
 
       if (! updateDesc.length) return '没有需要修改的设置。'
 
-      await ctx.database.set('w-squad', { id: squad.id }, squadUpdate)
-      return `小队${nn(name)}设置已更新：\n${updateDesc.join('\n')}`
+      await ctx.database.set('w-squad-v2', { id: squad.id }, squadUpdate)
+      return `小队${nn(formatSquad({ ...squad, ...squadUpdate }))}设置已更新：\n${updateDesc.join('\n')}`
     })
 
-  ctx.command('squad.invite <name:string> <invitee:user>', '邀请用户加入小队')
-    .action(async ({ session }, name, inviteeUid) => {
-      name = validateName(name)
-
-      const { id } = await validateSquadExists(ctx, name)
+  ctx.command('squad.invite <squad:string> <invitee:user>', '邀请用户加入小队')
+    .action(async ({ session }, source, inviteeUid) => {
+      const squad = await resolveSquad(ctx, session.uid, source, 'member')
+      const { id } = squad
 
       const { uid: inviterUid, username: inviterNick } = session
 
       const [[inviterMember], [inviteeMember], [invitation]] = await Promise.all([
-        ctx.database.get('w-squad-member', { uid: inviterUid, squadId: id }),
-        ctx.database.get('w-squad-member', { uid: inviteeUid, squadId: id }),
-        ctx.database.get('w-squad-invitation', { squadId: id, inviteeUid }),
+        ctx.database.get('w-squad-member-v2', { uid: inviterUid, squadId: id }),
+        ctx.database.get('w-squad-member-v2', { uid: inviteeUid, squadId: id }),
+        ctx.database.get('w-squad-invitation-v2', { squadId: id, inviteeUid }),
       ])
 
-      if (! inviterMember) return `你不在小队${nn(name)}中。`
-      if (inviteeMember) return `用户${nn(inviteeUid)}已在小队${nn(name)}中。`
-      if (invitation) return `你已邀请过用户${nn(inviteeUid)}加入小队 ${nn(name)}。`
+      if (!inviterMember) return `你不在小队${nn(formatSquad(squad))}中。`
+      if (inviteeMember) return `用户${nn(inviteeUid)}已在小队${nn(formatSquad(squad))}中。`
+      if (invitation) return `已有用户邀请${nn(inviteeUid)}加入小队 ${nn(formatSquad(squad))}。`
 
-      await ctx.database.create('w-squad-invitation', {
+      await ctx.database.create('w-squad-invitation-v2', {
         squadId: id,
         inviterUid,
         inviterNick,
         inviteeUid,
       })
 
-      return `已邀请用户${nn(inviteeUid)}加入小队 ${nn(name)}。`
+      return `已邀请用户${nn(inviteeUid)}加入小队 ${nn(formatSquad(squad))}。`
     })
 
   ctx.command('squad.invite.list', '查看和我有关的邀请')
@@ -186,7 +118,7 @@ export function apply(ctx: Context) {
       const [invitationToMe, invitationFromMe] = await Promise.all([
         ctx.database
           .join(
-            { squad: 'w-squad', invitation: 'w-squad-invitation' },
+            { squad: 'w-squad-v2', invitation: 'w-squad-invitation-v2' },
             row => $.and(
               $.eq(row.squad.id, row.invitation.squadId),
               $.eq(row.invitation.inviteeUid, uid),
@@ -194,12 +126,13 @@ export function apply(ctx: Context) {
           )
           .project({
             squadName: row => row.squad.name,
+            squadId: row => row.squad.id,
             inviterNick: row => row.invitation.inviterNick,
           })
           .execute(),
         ctx.database
           .join(
-            { squad: 'w-squad', invitation: 'w-squad-invitation' },
+            { squad: 'w-squad-v2', invitation: 'w-squad-invitation-v2' },
             row => $.and(
               $.eq(row.squad.id, row.invitation.squadId),
               $.eq(row.invitation.inviterUid, uid),
@@ -207,6 +140,7 @@ export function apply(ctx: Context) {
           )
           .project({
             squadName: row => row.squad.name,
+            squadId: row => row.squad.id,
             inviteeUid: row => row.invitation.inviteeUid,
           })
           .execute(),
@@ -219,7 +153,7 @@ export function apply(ctx: Context) {
               <p>你收到的邀请：</p>
               {
                 invitationToMe.map(it => <p>
-                  * {nn(it.inviterNick)} 邀请你加入小队 {nn(it.squadName)}
+                  * {nn(it.inviterNick)} 邀请你加入小队 {nn(`${it.squadName}#${it.squadId}`)}
                 </p>)
               }
             </>
@@ -232,7 +166,7 @@ export function apply(ctx: Context) {
               <p>你发出的邀请：</p>
               {
                 invitationFromMe.map(it => <p>
-                  * 你邀请 {nn(it.inviteeUid)} 加入小队 {nn(it.squadName)}
+                  * 你邀请 {nn(it.inviteeUid)} 加入小队 {nn(`${it.squadName}#${it.squadId}`)}
                 </p>)
               }
             </>
@@ -241,52 +175,44 @@ export function apply(ctx: Context) {
       </>
     })
 
-  ctx.command('squad.invite.accept <name:string>', '接受加入小队邀请')
-    .action(async ({ session }, name) => {
-      name = validateName(name)
+  ctx.command('squad.invite.accept <squad:string>', '接受加入小队邀请')
+    .action(async ({ session }, source) => {
       const { uid } = session
 
-      const { id } = await validateSquadExists(ctx, name)
-      const [invitation] = await ctx.database.get('w-squad-invitation', { squadId: id, inviteeUid: uid })
-      if (! invitation) return `你没有收到小队${nn(name)}的邀请。`
+      const squad = await resolveSquad(ctx, uid, source, 'invited')
+      const { id } = squad
 
       await Promise.all([
-        ctx.database.create('w-squad-member', {
+        ctx.database.create('w-squad-member-v2', {
           uid,
           squadId: id,
           nick: session.username,
           perm: 'member',
         }),
-        ctx.database.remove('w-squad-invitation', { squadId: id, inviteeUid: uid }),
+        ctx.database.remove('w-squad-invitation-v2', { squadId: id, inviteeUid: uid }),
       ])
 
-      return `成功加入小队 ${nn(name)}。`
+      return `成功加入小队 ${nn(formatSquad(squad))}。`
     })
 
-  ctx.command('squad.invite.reject <name:string>', '拒绝加入小队邀请')
-    .action(async ({ session }, name) => {
-      name = validateName(name)
-
+  ctx.command('squad.invite.reject <squad:string>', '拒绝加入小队邀请')
+    .action(async ({ session }, source) => {
       const { uid } = session
-
-      const { id } = await validateSquadExists(ctx, name)
-      const [invitation] = await ctx.database.get('w-squad-invitation', { squadId: id, inviteeUid: uid })
-      if (! invitation) return `你没有收到小队${nn(name)}的邀请。`
-
-      await ctx.database.remove('w-squad-invitation', { squadId: id, inviteeUid: uid })
+      const squad = await resolveSquad(ctx, uid, source, 'invited')
+      await ctx.database.remove('w-squad-invitation-v2', { squadId: squad.id, inviteeUid: uid })
     })
 
   ctx.command('squad.list', '列出我加入的小队')
     .option('all', '-a 列出所有小队')
     .action(async ({ session, options }) => {
       if (options.all) {
-        const squads = await ctx.database.get('w-squad', { isPublic: true })
+        const squads = await ctx.database.get('w-squad-v2', { isPublic: true })
 
         return squads.length
           ? <>
             <p>当前共有 {squads.length} 个公开小队：</p>
             { squads.map(it => <p>
-              * {emIn(JOIN_TYPE_DESC, ['free'], it.joinType)}{it.name}#{it.id}
+              * {emIn(JOIN_TYPE_DESC, ['free'], it.joinType)}{formatSquad(it)}
             </p>) }
           </>
           : '当前没有任何小队。'
@@ -296,7 +222,7 @@ export function apply(ctx: Context) {
 
       const squads = await ctx.database
         .join(
-          { squad: 'w-squad', member: 'w-squad-member' },
+          { squad: 'w-squad-v2', member: 'w-squad-member-v2' },
           row => $.and(
             $.eq(row.squad.id, row.member.squadId),
             $.eq(row.member.uid, uid),
@@ -319,108 +245,98 @@ export function apply(ctx: Context) {
         : '你还没有加入任何小队。'
     })
 
-  ctx.command('squad.join <name:string>', '加入小队')
-    .action(async ({ session }, name) => {
-      name = validateName(name)
-
-      const { id, joinType } = await validateSquadExists(ctx, name)
+  ctx.command('squad.join <squad:string>', '加入小队')
+    .action(async ({ session }, source) => {
+      const squad = await resolveSquad(ctx, session.uid, source, 'public')
+      const { id, joinType } = squad
 
       const { uid } = session
-      const [member] = await ctx.database.get('w-squad-member', { uid, squadId: id })
-      if (member) return `你已在小队${nn(name)}中。`
+      const [member] = await ctx.database.get('w-squad-member-v2', { uid, squadId: id })
+      if (member) return `你已在小队${nn(formatSquad(squad))}中。`
 
-      if (joinType === 'invite') return `小队${nn(name)}需邀请才能加入。`
+      if (joinType === 'invite') return `小队${nn(formatSquad(squad))}需邀请才能加入。`
 
-      await ctx.database.create('w-squad-member', {
+      await ctx.database.create('w-squad-member-v2', {
         uid,
         squadId: id,
         perm: 'member',
         nick: session.username,
       })
 
-      return `成功加入小队 ${nn(name)}。`
+      return `成功加入小队 ${nn(formatSquad(squad))}。`
     })
 
-  ctx.command('squad.leave <name:string>', '离开小队')
+  ctx.command('squad.leave <squad:string>', '离开小队')
     .alias('squad.quit')
-    .action(async ({ session }, name) => {
-      name = validateName(name)
-
-      const { id } = await validateSquadExists(ctx, name)
-      const [member] = await ctx.database.get('w-squad-member', { uid: session.uid, squadId: id })
-
-      if (! member) return `你不在小队${nn(name)}中。`
+    .action(async ({ session }, source) => {
+      const squad = await resolveSquad(ctx, session.uid, source, 'member')
+      const { id } = squad
+      const [member] = await ctx.database.get('w-squad-member-v2', { uid: session.uid, squadId: id })
 
       if (member.perm === 'owner') {
-        await session.send(`你是小队${nn(name)}的所有者，离开小队将会解散小队。回复 Y 继续。`)
+        await session.send(`你是小队${nn(formatSquad(squad))}的所有者，离开小队将会解散小队。回复 Y 继续。`)
         const resp = await session.prompt()
 
         if (resp !== 'Y') return '操作已取消。'
 
         await Promise.all([
-          ctx.database.remove('w-squad', { id }),
-          ctx.database.remove('w-squad-member', { squadId: id }),
+          ctx.database.remove('w-squad-member-v2', { squadId: id }),
+          ctx.database.remove('w-squad-invitation-v2', { squadId: id }),
         ])
-        return `小队${nn(name)}已被解散。`
+        await ctx.database.remove('w-squad-v2', { id })
+        return `小队${nn(formatSquad(squad))}已被解散。`
       }
 
-      await ctx.database.remove('w-squad-member', { uid: session.uid, squadId: id })
+      await ctx.database.remove('w-squad-member-v2', { uid: session.uid, squadId: id })
 
-      return `已离开小队 ${nn(name)}。`
+      return `已离开小队 ${nn(formatSquad(squad))}。`
     })
 
-  ctx.command('squad.transfer <name:string> <target:user>', '转让小队所有权')
-    .action(async ({ session }, name, targetUid) => {
-      name = validateName(name)
-
-      const squad = await validateSquadExists(ctx, name)
+  ctx.command('squad.transfer <squad:string> <target:user>', '转让小队所有权')
+    .action(async ({ session }, source, targetUid) => {
+      const squad = await resolveSquad(ctx, session.uid, source, 'member')
       const { id } = squad
 
       const [[member], [targetMember]] = await Promise.all([
-        ctx.database.get('w-squad-member', { uid: session.uid, squadId: id }),
-        ctx.database.get('w-squad-member', { uid: targetUid, squadId: id }),
+        ctx.database.get('w-squad-member-v2', { uid: session.uid, squadId: id }),
+        ctx.database.get('w-squad-member-v2', { uid: targetUid, squadId: id }),
       ])
 
-      if (! member) return `你不在小队${nn(name)}中。`
-      if (member.perm !== 'owner') return `你不是小队${nn(name)}的所有者，无法转让所有权。`
-      if (! targetMember) return `用户${nn(targetUid)}不在小队${nn(name)}中。`
+      if (member.perm !== 'owner') return `你不是小队${nn(formatSquad(squad))}的所有者，无法转让所有权。`
+      if (!targetMember) return `用户${nn(targetUid)}不在小队${nn(formatSquad(squad))}中。`
 
-      await ctx.database.set('w-squad-member', { uid: targetUid, squadId: id }, { perm: 'owner' })
-      await ctx.database.set('w-squad-member', { uid: session.uid, squadId: id }, { perm: 'member' })
+      await ctx.database.set('w-squad-member-v2', { uid: targetUid, squadId: id }, { perm: 'owner' })
+      await ctx.database.set('w-squad-member-v2', { uid: session.uid, squadId: id }, { perm: 'member' })
 
-      return `已将小队 ${nn(name)} 的所有权转让给用户 ${nn(targetUid)}。`
+      return `已将小队 ${nn(formatSquad(squad))} 的所有权转让给用户 ${nn(targetUid)}。`
     })
 
-  ctx.command('squad.kick <name:string> <target:user>', '踢出小队成员')
-    .action(async ({ session }, name, targetUid) => {
-      name = validateName(name)
-
-      const squad = await validateSquadExists(ctx, name)
+  ctx.command('squad.kick <squad:string> <target:user>', '踢出小队成员')
+    .action(async ({ session }, source, targetUid) => {
+      const squad = await resolveSquad(ctx, session.uid, source, 'member')
       const { id } = squad
 
       const [[member], [targetMember]] = await Promise.all([
-        ctx.database.get('w-squad-member', { uid: session.uid, squadId: id }),
-        ctx.database.get('w-squad-member', { uid: targetUid, squadId: id }),
+        ctx.database.get('w-squad-member-v2', { uid: session.uid, squadId: id }),
+        ctx.database.get('w-squad-member-v2', { uid: targetUid, squadId: id }),
       ])
 
-      if (! member) return `你不在小队${nn(name)}中。`
-      if (member.perm !== 'owner') return `你不是小队${nn(name)}的所有者，无法踢出成员。`
-      if (! targetMember) return `用户${nn(targetUid)}不在小队${nn(name)}中。`
+      if (member.perm !== 'owner') return `你不是小队${nn(formatSquad(squad))}的所有者，无法踢出成员。`
+      if (!targetMember) return `用户${nn(targetUid)}不在小队${nn(formatSquad(squad))}中。`
 
-      await ctx.database.remove('w-squad-member', { uid: targetUid, squadId: id })
+      await ctx.database.remove('w-squad-member-v2', { uid: targetUid, squadId: id })
 
-      return `已将用户${nn(targetUid)}踢出小队${nn(name)}。`
+      return `已将用户${nn(targetUid)}踢出小队${nn(formatSquad(squad))}。`
     })
 
-  ctx.command('squad.call <name:string> [message:text]', '呼叫所有小队成员，可以附带一条消息')
-    .action(async ({ session }, name, message) => {
+  ctx.command('squad.call <squad:string> [message:text]', '呼叫所有小队成员，可以附带一条消息')
+    .action(async ({ session }, source, message) => {
       if (session.isDirect) return '此命令只能在群聊中使用。'
 
-      name = validateName(name)
-      const { id } = await validateSquadExists(ctx, name)
+      const squad = await resolveSquad(ctx, session.uid, source, 'member')
+      const { id } = squad
 
-      const members = await ctx.database.get('w-squad-member', { squadId: id })
-      if (! members.some(member => member.uid === session.uid)) return `你不在小队${nn(name)}中。`
+      const members = await ctx.database.get('w-squad-member-v2', { squadId: id })
 
       const membersSorted = members
         .filter(member => member.uid !== session.uid)
@@ -448,12 +364,12 @@ export function apply(ctx: Context) {
 
           dndRuleIndex ++
         }
-        return ! dndMatched
+        return !dndMatched
       })
 
       return <>
         <p>
-          <at id={session.userId}></at> 正在呼叫小队 {nn(name)} 中所有成员！
+          <at id={session.userId}></at> 正在呼叫小队 {nn(formatSquad(squad))} 中所有成员！
           {
             membersFiltered.map(it => <>
               <at id={parseUid(it.uid).userId}></at>
@@ -468,16 +384,15 @@ export function apply(ctx: Context) {
       </>
     })
 
-  ctx.command('squad.info <name:string>', '查看小队信息')
-    .action(async ({ session }, name) => {
-      name = validateName(name)
+  ctx.command('squad.info <squad:string>', '查看小队信息')
+    .action(async ({ session }, source) => {
+      const squad = await resolveSquad(ctx, session.uid, source, 'public-or-member')
+      const { id, joinType } = squad
 
-      const { id, joinType } = await validateSquadExists(ctx, name)
-
-      const members = await ctx.database.get('w-squad-member', { squadId: id })
+      const members = await ctx.database.get('w-squad-member-v2', { squadId: id })
 
       return <>
-        <p>小队：{name}#{id}</p>
+        <p>小队：{formatSquad(squad)}</p>
         <p>加入方式：{JOIN_TYPE_DESC[joinType]}</p>
         <p>成员：{members.length}</p>
         {
