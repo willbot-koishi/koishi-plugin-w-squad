@@ -120,6 +120,7 @@ commands:
     messages:
       group-only: "此命令只能在群聊中使用。"
       summary: "正在呼叫小队「{squad}」中当前平台的成员！"
+      no-members: "当前平台没有其他可呼叫的小队成员。"
       dnd-summary: "（忽略了 {count} 名免打扰的成员）"
       attached-message: "【{message}】"
 

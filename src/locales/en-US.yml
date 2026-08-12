@@ -120,6 +120,7 @@ commands:
     messages:
       group-only: "This command can only be used in a guild channel."
       summary: 'Calling members of squad "{squad}" on this platform!'
+      no-members: "There are no other squad members available to call on this platform."
       dnd-summary: "(Skipped DND members: {count})"
       attached-message: "Message: {message}"
 

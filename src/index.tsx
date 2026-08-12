@@ -406,6 +406,9 @@ export function apply(ctx: Context) {
             </>)
           }
           {
+            membersFiltered.length ? '' : <> {session.text('.no-members')}</>
+          }
+          {
             dndMatchedCount ? <>{session.text('.dnd-summary', { count: dndMatchedCount })}</> : ''
           }
         </p>

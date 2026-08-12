@@ -95,6 +95,7 @@ describe('squad command safeguards', () => {
     const [reply] = await owner.receive(`squad.call #${id}`, 1)
     assert.match(reply, /<at id="member"\/>/)
     assert.doesNotMatch(reply, /<at id="foreign"\/>/)
+    assert.doesNotMatch(reply, /没有其他可呼叫的小队成员/)
   })
 
   it('counts each DND member once', async () => {
@@ -113,6 +114,7 @@ describe('squad command safeguards', () => {
 
     const [reply] = await owner.receive(`squad.call #${id}`, 1)
     assert.doesNotMatch(reply, /<at id="member"\/>/)
+    assert.match(reply, /当前平台没有其他可呼叫的小队成员/)
     assert.match(reply, /忽略了 1 名免打扰的成员/)
   })
 
@@ -139,6 +141,10 @@ describe('squad command safeguards', () => {
     await client.shouldReply(
       'squad.dnd.rule.check *',
       'The rule is valid: * (every day, all day)',
+    )
+    await client.shouldReply(
+      `squad.call #${id}`,
+      /There are no other squad members available to call on this platform\./,
     )
   })
 
