@@ -1,0 +1,222 @@
+commands:
+  squad:
+    description: "Squads"
+
+  squad.create:
+    description: "Create a squad"
+    arguments:
+      name: "Squad name"
+    options:
+      joinType: "How users may join (free | invite)"
+    messages:
+      success: 'Created squad "{squad}".'
+
+  squad.modify:
+    description: "Modify squad settings"
+    arguments:
+      squad: "Squad name, #ID, or name#ID"
+    options:
+      name: "New squad name"
+      joinType: "How users may join (free | invite)"
+    messages:
+      not-owner: 'You are not the owner of squad "{squad}" and cannot modify its settings.'
+      setting-name: 'Name: "{name}"'
+      setting-join-type: "Join type: {joinType}"
+      no-change: "No settings to change."
+      success: |-
+        Updated settings for squad "{squad}":
+        {changes}
+
+  squad.invite:
+    description: "Invite a user to a squad"
+    arguments:
+      squad: "Squad name, #ID, or name#ID"
+      invitee: "User to invite"
+    messages:
+      not-member: 'You are not in squad "{squad}".'
+      already-member: 'User "{uid}" is already in squad "{squad}".'
+      already-invited: 'User "{uid}" has already been invited to squad "{squad}".'
+      success: 'Invited user "{uid}" to squad "{squad}".'
+
+  squad.invite.list:
+    description: "List invitations related to me"
+    messages:
+      received-title: "Invitations you received:"
+      received-item: '* "{inviter}" invited you to squad "{squad}"'
+      no-received: "You have not received any invitations."
+      sent-title: "Invitations you sent:"
+      sent-item: '* You invited "{invitee}" to squad "{squad}"'
+      no-sent: "You have not sent any invitations."
+
+  squad.invite.accept:
+    description: "Accept a squad invitation"
+    arguments:
+      squad: "Squad name, #ID, or name#ID"
+    messages:
+      success: 'Joined squad "{squad}".'
+
+  squad.invite.reject:
+    description: "Reject a squad invitation"
+    arguments:
+      squad: "Squad name, #ID, or name#ID"
+
+  squad.list:
+    description: "List squads I have joined"
+    options:
+      all: "List all public squads"
+    messages:
+      public-summary: "Public squads: {count}"
+      no-public: "There are no public squads."
+      joined-summary: "Squads joined: {count}"
+      no-joined: "You have not joined any squads."
+      item: "* {badge}{squad}"
+
+  squad.join:
+    description: "Join a squad"
+    arguments:
+      squad: "Squad name, #ID, or name#ID"
+    messages:
+      already-member: 'You are already in squad "{squad}".'
+      invitation-required: 'Squad "{squad}" requires an invitation to join.'
+      success: 'Joined squad "{squad}".'
+
+  squad.leave:
+    description: "Leave a squad"
+    arguments:
+      squad: "Squad name, #ID, or name#ID"
+    messages:
+      dissolve-confirm: 'You own squad "{squad}". Leaving will dissolve it. Reply with Y to continue.'
+      cancelled: "Operation cancelled."
+      dissolved: 'Dissolved squad "{squad}".'
+      success: 'Left squad "{squad}".'
+
+  squad.transfer:
+    description: "Transfer squad ownership"
+    arguments:
+      squad: "Squad name, #ID, or name#ID"
+      target: "New owner"
+    messages:
+      not-owner: 'You are not the owner of squad "{squad}" and cannot transfer it.'
+      self: "You already own this squad."
+      target-not-member: 'User "{uid}" is not in squad "{squad}".'
+      success: 'Transferred ownership of squad "{squad}" to user "{uid}".'
+
+  squad.kick:
+    description: "Remove a squad member"
+    arguments:
+      squad: "Squad name, #ID, or name#ID"
+      target: "Member to remove"
+    messages:
+      not-owner: 'You are not the owner of squad "{squad}" and cannot remove members.'
+      self: "The squad owner cannot remove themselves."
+      target-not-member: 'User "{uid}" is not in squad "{squad}".'
+      success: 'Removed user "{uid}" from squad "{squad}".'
+
+  squad.call:
+    description: "Call all squad members with an optional message"
+    arguments:
+      squad: "Squad name, #ID, or name#ID"
+      message: "Optional message"
+    messages:
+      group-only: "This command can only be used in a guild channel."
+      summary: 'Calling members of squad "{squad}" on this platform!'
+      dnd-summary: "(Skipped DND members: {count})"
+      attached-message: "Message: {message}"
+
+  squad.info:
+    description: "Show squad information"
+    arguments:
+      squad: "Squad name, #ID, or name#ID"
+    messages:
+      name: "Squad: {squad}"
+      join-type: "Join type: {joinType}"
+      members: "Members: {count}"
+      member-item: "* {badges}{nick}"
+
+  squad.dnd:
+    description: "Squad call do-not-disturb"
+
+  squad.dnd.test:
+    description: "Test whether DND is active now"
+    messages:
+      active: |-
+        DND is currently active because of these rules:
+        {rules}
+      inactive: "DND is not currently active."
+
+  squad.dnd.rule:
+    description: "Squad call DND rules"
+
+  squad.dnd.rule.check:
+    description: "Check the syntax of a DND rule"
+    arguments:
+      rule: "DND rule"
+    messages:
+      valid: "The rule is valid: {rule} ({explanation})"
+      invalid: "Invalid rule: {error}"
+
+  squad.dnd.rule.list:
+    description: "List squad call DND rules"
+    messages:
+      summary: "DND rules: {count}"
+      item: "[{slot}] {rule}"
+      none: "You have not configured any DND rules."
+
+  squad.dnd.rule.add:
+    description: "Add a squad call DND rule"
+    arguments:
+      rule: "DND rule"
+    messages:
+      success: "Added DND rule {rule}"
+
+  squad.dnd.rule.remove:
+    description: "Remove a squad call DND rule"
+    arguments:
+      slot: "Rule number"
+    messages:
+      not-found: "There is no DND rule numbered [{slot}]."
+      success: "Removed DND rule {rule}."
+
+w-squad:
+  errors:
+    empty-name: "The squad name cannot be empty."
+    name-contains-hash: "The squad name cannot contain #."
+    empty-selector: "The squad selector cannot be empty."
+    invalid-id: "Invalid squad ID: {id}."
+    inaccessible-id: "No accessible squad exists with ID #{id}."
+    inaccessible-name: 'No accessible squad exists with the name "{name}".'
+    ambiguous-name: |-
+      Multiple accessible squads are named "{name}". Specify an ID:
+      {squads}
+    invalid-permission: "Invalid permission. Expected {expected}, but received {actual}."
+    invalid-join-type: "Invalid join type. Expected {expected}, but received {actual}."
+    invalid-day: "Invalid weekday: {day}. Expected {expected}."
+    invalid-day-range: "Invalid weekday range: {range}. Use a range such as mon-fri."
+    invalid-days: "Invalid weekday match: {days}. Use * or a list such as mon-fri,sun."
+    invalid-period: "Invalid time period: {period}. Use a period such as 8:00-17:30."
+    invalid-time: "Invalid time: {time}. Only hours and minutes are supported."
+    invalid-hour: "Invalid hour: {hour}."
+    invalid-minute: "Invalid minute: {minute}."
+  badges:
+    owner: "[Owner] "
+    free: "[Open] "
+    self: "[You] "
+  join-types:
+    free: "Free to join"
+    invite: "Invitation only"
+  dnd:
+    every-day: "every day"
+    all-day: "all day"
+    day-separator: ", "
+    days:
+      sun: "Sunday"
+      mon: "Monday"
+      tue: "Tuesday"
+      wed: "Wednesday"
+      thu: "Thursday"
+      fri: "Friday"
+      sat: "Saturday"
+    explanation: "{days}, {period}"
+    period: "{start} to {end}"
+    overnight-period: "{start} to {end} the next day"
+    formatted: "{rule} ({explanation})"

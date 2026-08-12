@@ -26,6 +26,10 @@ async function createFixture() {
   ctx.plugin(memory)
   ctx.plugin(squadPlugin)
   const mock = ctx.plugin(Mock as Plugin.Constructor)
+  ctx.middleware((session, next) => {
+    if (session.userId === 'english') session.locales = ['en-US']
+    return next()
+  }, true)
   fixtures.push({ ctx, mock })
   await ctx.start()
   return ctx
@@ -110,5 +114,52 @@ describe('squad command safeguards', () => {
     const [reply] = await owner.receive(`squad.call #${id}`, 1)
     assert.doesNotMatch(reply, /<at id="member"\/>/)
     assert.match(reply, /忽略了 1 名免打扰的成员/)
+  })
+
+  it('renders commands and validation errors in English', async () => {
+    const ctx = await createFixture()
+    const client = ctx.mock.client('english', 'group')
+
+    const [created] = await client.receive('squad.create Alpha', 1)
+    assert.match(created, /^Created squad "Alpha#[0-9A-HJKMNP-TV-Z]{8}"\.$/)
+    const id = created.match(/#([0-9A-HJKMNP-TV-Z]{8})/)![1]
+
+    await client.shouldReply(
+      `squad.modify #${id} --join-type invalid`,
+      'Invalid join type. Expected free|invite, but received invalid.',
+    )
+    await client.shouldReply(
+      'squad.info Missing',
+      'No accessible squad exists with the name "Missing".',
+    )
+    await client.shouldReply(
+      'squad.dnd.rule.check nonsense',
+      'Invalid rule: Invalid weekday match: nonsense. Use * or a list such as mon-fri,sun.',
+    )
+    await client.shouldReply(
+      'squad.dnd.rule.check *',
+      'The rule is valid: * (every day, all day)',
+    )
+  })
+
+  it('provides Chinese and English command metadata', async () => {
+    const ctx = await createFixture()
+    const commands = ctx.$commander._commandList.filter(command =>
+      command.name === 'squad' || command.name.startsWith('squad.'),
+    )
+
+    for (const command of commands) {
+      const data = command.toJSON()
+      assert.ok(data.description['zh-CN'], `missing zh-CN description for ${command.name}`)
+      assert.ok(data.description['en-US'], `missing en-US description for ${command.name}`)
+      for (const argument of data.arguments) {
+        assert.ok(argument.description['zh-CN'], `missing zh-CN argument ${command.name}.${argument.name}`)
+        assert.ok(argument.description['en-US'], `missing en-US argument ${command.name}.${argument.name}`)
+      }
+      for (const option of data.options) {
+        assert.ok(option.description['zh-CN'], `missing zh-CN option ${command.name}.${option.name}`)
+        assert.ok(option.description['en-US'], `missing en-US option ${command.name}.${option.name}`)
+      }
+    }
   })
 })

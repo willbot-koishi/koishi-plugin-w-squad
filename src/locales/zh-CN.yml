@@ -1,0 +1,222 @@
+commands:
+  squad:
+    description: "小队"
+
+  squad.create:
+    description: "创建一个小队"
+    arguments:
+      name: "小队名称"
+    options:
+      joinType: "加入小队方式 (free | invite)"
+    messages:
+      success: "成功创建小队「{squad}」。"
+
+  squad.modify:
+    description: "修改小队设置"
+    arguments:
+      squad: "小队名称、#ID 或名称#ID"
+    options:
+      name: "新的小队名称"
+      joinType: "加入小队方式 (free | invite)"
+    messages:
+      not-owner: "你不是小队「{squad}」的所有者，无法修改设置。"
+      setting-name: "名称：「{name}」"
+      setting-join-type: "加入方式：{joinType}"
+      no-change: "没有需要修改的设置。"
+      success: |-
+        小队「{squad}」设置已更新：
+        {changes}
+
+  squad.invite:
+    description: "邀请用户加入小队"
+    arguments:
+      squad: "小队名称、#ID 或名称#ID"
+      invitee: "被邀请的用户"
+    messages:
+      not-member: "你不在小队「{squad}」中。"
+      already-member: "用户「{uid}」已在小队「{squad}」中。"
+      already-invited: "已有用户邀请「{uid}」加入小队「{squad}」。"
+      success: "已邀请用户「{uid}」加入小队「{squad}」。"
+
+  squad.invite.list:
+    description: "查看和我有关的邀请"
+    messages:
+      received-title: "你收到的邀请："
+      received-item: "* 「{inviter}」邀请你加入小队「{squad}」"
+      no-received: "你没有收到邀请。"
+      sent-title: "你发出的邀请："
+      sent-item: "* 你邀请「{invitee}」加入小队「{squad}」"
+      no-sent: "你没有发出邀请。"
+
+  squad.invite.accept:
+    description: "接受加入小队邀请"
+    arguments:
+      squad: "小队名称、#ID 或名称#ID"
+    messages:
+      success: "成功加入小队「{squad}」。"
+
+  squad.invite.reject:
+    description: "拒绝加入小队邀请"
+    arguments:
+      squad: "小队名称、#ID 或名称#ID"
+
+  squad.list:
+    description: "列出我加入的小队"
+    options:
+      all: "列出所有公开小队"
+    messages:
+      public-summary: "当前共有 {count} 个公开小队："
+      no-public: "当前没有任何公开小队。"
+      joined-summary: "你加入了 {count} 个小队："
+      no-joined: "你还没有加入任何小队。"
+      item: "* {badge}{squad}"
+
+  squad.join:
+    description: "加入小队"
+    arguments:
+      squad: "小队名称、#ID 或名称#ID"
+    messages:
+      already-member: "你已在小队「{squad}」中。"
+      invitation-required: "小队「{squad}」需邀请才能加入。"
+      success: "成功加入小队「{squad}」。"
+
+  squad.leave:
+    description: "离开小队"
+    arguments:
+      squad: "小队名称、#ID 或名称#ID"
+    messages:
+      dissolve-confirm: "你是小队「{squad}」的所有者，离开小队将会解散小队。回复 Y 继续。"
+      cancelled: "操作已取消。"
+      dissolved: "小队「{squad}」已被解散。"
+      success: "已离开小队「{squad}」。"
+
+  squad.transfer:
+    description: "转让小队所有权"
+    arguments:
+      squad: "小队名称、#ID 或名称#ID"
+      target: "新的所有者"
+    messages:
+      not-owner: "你不是小队「{squad}」的所有者，无法转让所有权。"
+      self: "你已经是该小队的所有者。"
+      target-not-member: "用户「{uid}」不在小队「{squad}」中。"
+      success: "已将小队「{squad}」的所有权转让给用户「{uid}」。"
+
+  squad.kick:
+    description: "踢出小队成员"
+    arguments:
+      squad: "小队名称、#ID 或名称#ID"
+      target: "要踢出的成员"
+    messages:
+      not-owner: "你不是小队「{squad}」的所有者，无法踢出成员。"
+      self: "小队所有者不能将自己踢出小队。"
+      target-not-member: "用户「{uid}」不在小队「{squad}」中。"
+      success: "已将用户「{uid}」踢出小队「{squad}」。"
+
+  squad.call:
+    description: "呼叫所有小队成员，可以附带一条消息"
+    arguments:
+      squad: "小队名称、#ID 或名称#ID"
+      message: "附带的消息"
+    messages:
+      group-only: "此命令只能在群聊中使用。"
+      summary: "正在呼叫小队「{squad}」中当前平台的成员！"
+      dnd-summary: "（忽略了 {count} 名免打扰的成员）"
+      attached-message: "【{message}】"
+
+  squad.info:
+    description: "查看小队信息"
+    arguments:
+      squad: "小队名称、#ID 或名称#ID"
+    messages:
+      name: "小队：{squad}"
+      join-type: "加入方式：{joinType}"
+      members: "成员：{count}"
+      member-item: "* {badges}{nick}"
+
+  squad.dnd:
+    description: "小队呼叫免打扰"
+
+  squad.dnd.test:
+    description: "测试现在你是否处于免打扰时段"
+    messages:
+      active: |-
+        你当前处于免打扰时段，由以下规则生效：
+        {rules}
+      inactive: "你当前不处于免打扰时段。"
+
+  squad.dnd.rule:
+    description: "小队呼叫免打扰规则"
+
+  squad.dnd.rule.check:
+    description: "检查小队呼叫免打扰规则格式"
+    arguments:
+      rule: "免打扰规则"
+    messages:
+      valid: "规则格式正确：{rule}（{explanation}）"
+      invalid: "规则格式错误：{error}"
+
+  squad.dnd.rule.list:
+    description: "查看小队呼叫免打扰规则"
+    messages:
+      summary: "你设置了 {count} 条免打扰规则："
+      item: "[{slot}] {rule}"
+      none: "你还没有设置任何免打扰规则。"
+
+  squad.dnd.rule.add:
+    description: "添加小队呼叫免打扰规则"
+    arguments:
+      rule: "免打扰规则"
+    messages:
+      success: "已添加免打扰规则 {rule}"
+
+  squad.dnd.rule.remove:
+    description: "删除小队呼叫免打扰规则"
+    arguments:
+      slot: "规则编号"
+    messages:
+      not-found: "不存在编号为 [{slot}] 的免打扰规则。"
+      success: "已删除免打扰规则 {rule}。"
+
+w-squad:
+  errors:
+    empty-name: "小队名不能为空。"
+    name-contains-hash: "小队名不能包含 #。"
+    empty-selector: "小队标识不能为空。"
+    invalid-id: "无效的小队 ID：{id}。"
+    inaccessible-id: "不存在可访问的小队 #{id}。"
+    inaccessible-name: "不存在可访问的名为「{name}」的小队。"
+    ambiguous-name: |-
+      存在多个名为「{name}」的小队，请使用 ID 指定：
+      {squads}
+    invalid-permission: "无效的权限。应为 {expected}，得到了 {actual}。"
+    invalid-join-type: "无效的加入方式。应为 {expected}，得到了 {actual}。"
+    invalid-day: "无效的星期：{day}。应为 {expected}。"
+    invalid-day-range: "无效的星期区间：{range}。应为形如 mon-fri 的区间。"
+    invalid-days: "无效的星期匹配：{days}。应为通配符 * 或形如 mon-fri,sun 的列表。"
+    invalid-period: "无效的时间段：{period}。应为形如 8:00-17:30 的区间。"
+    invalid-time: "无效的时间：{time}。仅支持小时和分钟。"
+    invalid-hour: "无效的小时：{hour}。"
+    invalid-minute: "无效的分钟：{minute}。"
+  badges:
+    owner: "【所有者】"
+    free: "【自由加入】"
+    self: "【你】"
+  join-types:
+    free: "自由加入"
+    invite: "邀请加入"
+  dnd:
+    every-day: "每天"
+    all-day: "全天"
+    day-separator: "、"
+    days:
+      sun: "周日"
+      mon: "周一"
+      tue: "周二"
+      wed: "周三"
+      thu: "周四"
+      fri: "周五"
+      sat: "周六"
+    explanation: "{days} {period}"
+    period: "{start} 至 {end}"
+    overnight-period: "{start} 至次日 {end}"
+    formatted: "{rule}（{explanation}）"

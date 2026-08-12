@@ -21,7 +21,7 @@
     "build": "yarn run -T build w-squad",
     "bump": "yarn run -T bump w-squad",
     "pub": "yarn run -T pub w-squad",
-    "test": "tsx --test test/*.test.ts"
+    "test": "tsx -r yml-register --test test/*.test.ts"
   },
   "dependencies": {
     "@satorijs/element": "^3.1.8"
@@ -29,6 +29,7 @@
   "devDependencies": {
     "@koishijs/plugin-database-memory": "^3.7.0",
     "@koishijs/plugin-mock": "^2.6.6",
-    "tsx": "^4.23.1"
+    "tsx": "^4.23.1",
+    "yml-register": "^1.2.5"
   }
 }

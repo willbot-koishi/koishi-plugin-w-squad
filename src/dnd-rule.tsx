@@ -1,3 +1,5 @@
+import { type Session } from 'koishi'
+
 import { fail } from './utils'
 
 /**
@@ -39,15 +41,14 @@ export const DAY_NUM_TO_NAME: Record<number, string> = [
   'sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'
 ]
 
-export const DAY_NUM_TO_EXPLAIN: Record<number, string> = [
-  '周日', '周一', '周二', '周三', '周四', '周五', '周六'
-]
-
 export function parseDndRuleDay(dayText: string): number {
   if (dayText in DAY_NAME_TO_NUM) {
     return DAY_NAME_TO_NUM[dayText]
   }
-  fail(`无效的星期：${dayText}。应为 ${Object.keys(DAY_NAME_TO_NUM).join('|')}。`)
+  fail('w-squad.errors.invalid-day', {
+    day: dayText,
+    expected: Object.keys(DAY_NAME_TO_NUM).join('|'),
+  })
 }
 
 export function parseDndRuleDays(daysText: string): SquadDndRuleDays {
@@ -61,7 +62,7 @@ export function parseDndRuleDays(daysText: string): SquadDndRuleDays {
     else if (daysItemText.includes('-')) {
       const daysItemParts = daysItemText.split('-')
       if (daysItemParts.length !== 2) {
-        fail(`无效的星期区间：${daysItemText}。应为形如 mon-fri 的区间。`)
+        fail('w-squad.errors.invalid-day-range', { range: daysItemText })
       }
       const [dayStart, dayEnd] = daysItemParts.map(parseDndRuleDay)
       for (let day = dayStart; ; day = (day + 1) % 7) {
@@ -70,7 +71,7 @@ export function parseDndRuleDays(daysText: string): SquadDndRuleDays {
       }
     }
     else {
-      fail(`无效的星期匹配：${daysItemText}。应为通配符 * 或形如 mon-fri,sun 的列表。`)
+      fail('w-squad.errors.invalid-days', { days: daysItemText })
     }
   }
 
@@ -82,7 +83,7 @@ export function parseDndRulePeriod(periodText: string): SquadDndRulePeriod {
 
   const parts = periodText.split('-')
   if (parts.length !== 2) {
-    fail(`无效的时间段：${periodText}。应为形如 8:00-17:30 的区间。`)
+    fail('w-squad.errors.invalid-period', { period: periodText })
   }
 
   let [hourStart, hourEnd] = parts.map(parseDndRuleTime)
@@ -94,7 +95,7 @@ export function parseDndRulePeriod(periodText: string): SquadDndRulePeriod {
 export function parseDndRuleTime(timeText: string): number {
   const timeParts = timeText.split(':')
   if (timeParts.length > 2) {
-    fail(`无效的时间：${timeText}。仅支持小时和分钟。`)
+    fail('w-squad.errors.invalid-time', { time: timeText })
   }
 
   const [hourText, minuteText] = timeParts
@@ -107,7 +108,7 @@ export function parseDndRuleHour(hourText: string): number {
     const hour = Number(hourText)
     if (hour < 24) return hour
   }
-  fail(`无效的小时：${hourText}。`)
+  fail('w-squad.errors.invalid-hour', { hour: hourText })
 }
 
 export function parseDndRuleMinute(minuteText: string): number {
@@ -116,7 +117,7 @@ export function parseDndRuleMinute(minuteText: string): number {
     const minute = Number(minuteText)
     if (minute < 60) return minute
   }
-  fail(`无效的分钟：${minuteText}。`)
+  fail('w-squad.errors.invalid-minute', { minute: minuteText })
 }
 
 export function formatDndRule(rule: SquadDndRule): string {
@@ -142,23 +143,33 @@ export function formatDndRuleTime(hour: number): string {
   return [hourInt, minute].map(n => n.toString().padStart(2, '0')).join(':')
 }
 
-export function explainDndRule(rule: SquadDndRule): string {
-  return `${explainDndRuleDays(rule.days)} ${explainDndRulePeriod(rule.period)}`
+export function explainDndRule(rule: SquadDndRule, session: Session): string {
+  return session.text('w-squad.dnd.explanation', {
+    days: explainDndRuleDays(rule.days, session),
+    period: explainDndRulePeriod(rule.period, session),
+  })
 }
 
-export function explainDndRuleDays(days: SquadDndRuleDays): string {
-  if (days === null) return '每天'
-  return days.toSorted().map(day => DAY_NUM_TO_EXPLAIN[day]).join('、')
+export function explainDndRuleDays(days: SquadDndRuleDays, session: Session): string {
+  if (days === null) return session.text('w-squad.dnd.every-day')
+  const separator = session.text('w-squad.dnd.day-separator')
+  return days.toSorted().map(day => session.text(`w-squad.dnd.days.${DAY_NUM_TO_NAME[day]}`)).join(separator)
 }
 
-export function explainDndRulePeriod(period: SquadDndRulePeriod): string {
-  if (period === null) return '全天'
+export function explainDndRulePeriod(period: SquadDndRulePeriod, session: Session): string {
+  if (period === null) return session.text('w-squad.dnd.all-day')
   const [hourStart, hourEnd] = period
-  return `${formatDndRuleTime(hourStart)} 至${hourEnd >= 24 ? '次日' : ''} ${formatDndRuleTime(hourEnd % 24)}`
+  return session.text(`w-squad.dnd.${hourEnd >= 24 ? 'overnight-period' : 'period'}`, {
+    start: formatDndRuleTime(hourStart),
+    end: formatDndRuleTime(hourEnd % 24),
+  })
 }
 
-export function explainDndRuleWithFormatted(rule: SquadDndRule): string {
-  return `${formatDndRule(rule)}（${explainDndRule(rule)}）`
+export function explainDndRuleWithFormatted(rule: SquadDndRule, session: Session): string {
+  return session.text('w-squad.dnd.formatted', {
+    rule: formatDndRule(rule),
+    explanation: explainDndRule(rule, session),
+  })
 }
 
 export function testDndRule(rule: SquadDndRule, date: Date): boolean {

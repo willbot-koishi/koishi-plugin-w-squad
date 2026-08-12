@@ -1,21 +1,17 @@
-import { SessionError } from 'koishi'
+import { SessionError, type Dict } from 'koishi'
 
-export const fail = (message: string): never => {
-  throw new SessionError('w-squad.error', [ message ])
+export const fail = (path: string, param?: Dict): never => {
+  throw new SessionError(path, param)
 }
 
-export const getValidator = <const Ts extends readonly any[]>(values: Ts, desc = '值') => {
+export const getValidator = <const Ts extends readonly any[]>(values: Ts, errorPath: string) => {
   type T = Ts[number]
   const is = (value: unknown): value is T => values.includes(value as T)
   const validate = (value: unknown): T => {
-    if (! is(value))
-      fail(`无效的${desc}。应为 ${values.join('|')}，得到了 ${value}。`)
+    if (!is(value)) {
+      fail(errorPath, { expected: values.join('|'), actual: value })
+    }
     return value
   }
   return { is, validate }
 }
-
-export const nn = (text: string): string => `「${text}」`
-export const em = (text: string): string => `【${text}】`
-export const emIn = <T extends string>(desc: Record<T, string>, keys: T[], key: T) =>
-  keys.includes(key) ? em(desc[key]) : ''
