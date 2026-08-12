@@ -55,4 +55,24 @@ describe('squad command safeguards', () => {
     await owner.shouldReply(`squad.modify #${id} -n Renamed`, /设置已更新/)
     assert.equal((await ctx.database.get('w-squad-v2', { id }))[0].name, 'Renamed')
   })
+
+  it('preserves ownership on self-targeted transfer and kick', async () => {
+    const ctx = await createFixture()
+    const { id, owner } = await createSquad(ctx)
+
+    await owner.shouldReply(
+      `squad.transfer #${id} <at id="owner"/>`,
+      '你已经是该小队的所有者。',
+    )
+    await owner.shouldReply(
+      `squad.kick #${id} <at id="owner"/>`,
+      '小队所有者不能将自己踢出小队。',
+    )
+
+    const [storedOwner] = await ctx.database.get('w-squad-member-v2', {
+      uid: 'mock:owner',
+      squadId: id,
+    })
+    assert.equal(storedOwner.perm, 'owner')
+  })
 })

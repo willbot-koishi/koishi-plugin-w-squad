@@ -310,6 +310,7 @@ export function apply(ctx: Context) {
       ])
 
       if (member.perm !== 'owner') return `你不是小队${nn(formatSquad(squad))}的所有者，无法转让所有权。`
+      if (targetUid === session.uid) return '你已经是该小队的所有者。'
       if (!targetMember) return `用户${nn(targetUid)}不在小队${nn(formatSquad(squad))}中。`
 
       await ctx.database.set('w-squad-member-v2', { uid: targetUid, squadId: id }, { perm: 'owner' })
@@ -329,6 +330,7 @@ export function apply(ctx: Context) {
       ])
 
       if (member.perm !== 'owner') return `你不是小队${nn(formatSquad(squad))}的所有者，无法踢出成员。`
+      if (targetUid === session.uid) return '小队所有者不能将自己踢出小队。'
       if (!targetMember) return `用户${nn(targetUid)}不在小队${nn(formatSquad(squad))}中。`
 
       await ctx.database.remove('w-squad-member-v2', { uid: targetUid, squadId: id })
