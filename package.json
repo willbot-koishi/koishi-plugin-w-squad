@@ -18,9 +18,9 @@
     "koishi": "^4.18.10"
   },
   "scripts": {
-    "build": "yarn workspace willbot build w-squad",
-    "bump": "yarn workspace willbot bump w-squad",
-    "pub": "yarn workspace willbot pub w-squad"
+    "build": "yarn run -T build w-squad",
+    "bump": "yarn run -T bump w-squad",
+    "pub": "yarn run -T pub w-squad"
   },
   "dependencies": {
     "@satorijs/element": "^3.1.8"
