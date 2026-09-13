@@ -209,6 +209,26 @@ describe('squad command safeguards', () => {
     }
   })
 
+  it('limits squad calls to the current channel', async () => {
+    const ctx = await createFixture()
+    const { id } = await createSquad(ctx)
+    const caller = ctx.mock.client('owner', 'group-a')
+    const local = ctx.mock.client('local', 'group-a')
+    const remote = ctx.mock.client('remote', 'group-b')
+
+    await local.shouldReply(`squad.join #${id}`, /成功加入小队/)
+    await remote.shouldReply(`squad.join #${id}`, /成功加入小队/)
+
+    const proactive = captureProactiveMessages(ctx)
+    const replies = await caller.receive(`squad.call #${id} --local 集合`)
+
+    assert.equal(replies.length, 1)
+    assert.match(replies[0], /<at id="local"\/>/)
+    assert.doesNotMatch(replies[0], /<at id="remote"\/>/)
+    assert.match(replies[0], /呼叫结果：成功投递到 1 个群，0 个群投递失败/)
+    assert.equal(proactive.length, 0)
+  })
+
   it('reports delivery failures without failing the command', async () => {
     const ctx = await createFixture()
     const { id, owner } = await createSquad(ctx)

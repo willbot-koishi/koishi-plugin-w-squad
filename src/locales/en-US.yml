@@ -163,6 +163,8 @@ commands:
     arguments:
       squad: "Squad name, #ID, or name#ID"
       message: "Optional message"
+    options:
+      local: "Call only in the current channel"
     messages:
       group-only: "This command can only be used in a guild channel."
       summary: 'Calling members of squad "{squad}"!'

@@ -163,6 +163,8 @@ commands:
     arguments:
       squad: "小队名称、#ID 或名称#ID"
       message: "附带的消息"
+    options:
+      local: "仅在当前群呼叫"
     messages:
       group-only: "此命令只能在群聊中使用。"
       summary: "正在呼叫小队「{squad}」的成员！"

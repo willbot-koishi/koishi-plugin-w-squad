@@ -478,14 +478,17 @@ export function apply(ctx: Context) {
     })
 
   ctx.command('squad.call <squad:string> [message:text]')
-    .action(async ({ session }, source, message) => {
+    .option('local', '-l, --local')
+    .action(async ({ session, options }, source, message) => {
       if (session.isDirect) return session.text('.group-only')
 
       const squad = await resolveSquad(ctx, session.uid, source, 'member')
       const plan = await createSquadCallPlan(ctx, squad.id, session.uid)
       const currentKey = getEndpointKey(getEndpointIdentity(session))
       const currentTarget = plan.targets.find(target => getEndpointKey(target.endpoint) === currentKey)
-      const remoteTargets = plan.targets.filter(target => target !== currentTarget)
+      const remoteTargets = options.local
+        ? []
+        : plan.targets.filter(target => target !== currentTarget)
 
       const renderCall = (target: SquadCallTarget, current = false) => <>
         <p>
@@ -507,7 +510,9 @@ export function apply(ctx: Context) {
       const renderResult = () => <>
         <p>{session.text('.result', { succeeded, failed })}</p>
         {plan.otherMemberCount ? '' : <p>{session.text('.no-members')}</p>}
-        {plan.otherMemberCount && !plan.targets.length ? <p>{session.text('.no-delivery')}</p> : ''}
+        {plan.otherMemberCount && !currentTarget && !remoteTargets.length
+          ? <p>{session.text('.no-delivery')}</p>
+          : ''}
         {plan.dndMemberCount ? <p>{session.text('.dnd-summary', { count: plan.dndMemberCount })}</p> : ''}
         {plan.unboundMemberCount
           ? <p>{session.text('.unbound-summary', { count: plan.unboundMemberCount })}</p>

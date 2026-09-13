@@ -19,6 +19,7 @@
   },
   "scripts": {
     "build": "yarn run -T build w-squad",
+    "yakumo:before:pub": "yarn build",
     "bump": "yarn run -T bump w-squad",
     "pub": "yarn run -T pub w-squad",
     "test": "tsx -r yml-register --test test/*.test.ts"
